@@ -27,7 +27,7 @@ func loadConfig() Config {
 		listenAddr: getEnv("LISTEN_ADDR",
 			":9092"),
 		wsURL: getEnv("WS_URL",
-			"wss://f1883acfd743.ngrok-free.app/media"),
+			"ws://localhost:8080/media"),
 		maxCallDuration: 2 * time.Minute,
 		slinChunkSize:   int(audiosocket.DefaultSlinChunkSize), //  320 bytes (20ms @ 8kHz, 16-bit signed linear)
 		wsWriteTimeout:  250 * time.Millisecond,
