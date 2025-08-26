@@ -195,14 +195,38 @@ def echo(ws):
                                 UserSpeech = " ".join(response_input_buffer)
                                 Final_Transcript.append("User:  " + UserSpeech + "\n")
                                 response_input_buffer.clear()
+                                # REMOVE FOR PRODUCTION: Log user speech in real-time
+                                debug_logger.log(f"USER SPEECH: {UserSpeech}")  # REMOVE FOR PRODUCTION
                             if len(response_output_buffer) >= 1:
                                 GeminiSpeech = " ".join(response_output_buffer)
                                 Final_Transcript.append("Virtual Agent: " + GeminiSpeech + "\n")
                                 response_output_buffer.clear()
+                                # REMOVE FOR PRODUCTION: Log Gemini speech in real-time
+                                debug_logger.log(f"GEMINI SPEECH: {GeminiSpeech}")  # REMOVE FOR PRODUCTION
+                                
+                                # REMOVE FOR PRODUCTION: Write ongoing transcript to file
+                                try:
+                                    ongoing_transcript = "".join(Final_Transcript)
+                                    with open("live_conversation_transcript.txt", "w", encoding="utf-8") as f:
+                                        f.write(f"=== LIVE CONVERSATION TRANSCRIPT ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===\n")
+                                        f.write(ongoing_transcript)
+                                        f.write("\n=== CONVERSATION IN PROGRESS ===\n")
+                                except Exception as live_transcript_error:
+                                    debug_logger.log_error("live_transcript_writing", live_transcript_error)  # REMOVE FOR PRODUCTION
 
                         if response.tool_call:
                             try:
                                 Transcript = "".join(Final_Transcript)
+                                
+                                # REMOVE FOR PRODUCTION: Write transcript to local file
+                                try:
+                                    with open("conversation_transcript.txt", "w", encoding="utf-8") as f:
+                                        f.write(f"=== CONVERSATION TRANSCRIPT ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===\n")
+                                        f.write(Transcript)
+                                        f.write("\n=== END OF TRANSCRIPT ===\n")
+                                    debug_logger.log("Transcript written to conversation_transcript.txt")  # REMOVE FOR PRODUCTION
+                                except Exception as transcript_error:
+                                    debug_logger.log_error("transcript_writing", transcript_error)  # REMOVE FOR PRODUCTION
                                 
                                 # Upload to GCS using configured bucket
                                 print(Transcript)
@@ -259,4 +283,9 @@ def echo(ws):
     ))
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    print("Starting Python WebSocket server...")
+    print("Server will run on http://0.0.0.0:8080")
+    print("WebSocket endpoint: ws://localhost:8080/media")
+    print("Press Ctrl+C to stop")
+    print("-" * 50)
+    app.run(host="0.0.0.0", port=8080, debug=True)

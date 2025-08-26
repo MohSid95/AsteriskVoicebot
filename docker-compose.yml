@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  python-websocket:
+    build: ./python-websocket
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+      - ./transcripts:/app/transcripts
+      - ./python-websocket:/app
+      - ./credentials.json:/app/credentials.json:ro  # Mount Google Cloud credentials
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+    networks:
+      - voicebot-network
+    restart: unless-stopped
+
+  go-audiosocket:
+    build: ./go-audiosocket
+    ports:
+      - "9092:9092"
+    environment:
+      - WS_URL=ws://python-websocket:8080/media
+    depends_on:
+      - python-websocket
+    networks:
+      - voicebot-network
+    restart: unless-stopped
+
+networks:
+  voicebot-network:
+    driver: bridge
+
+volumes:
+  logs:
+  transcripts:

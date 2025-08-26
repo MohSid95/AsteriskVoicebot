@@ -41,6 +41,23 @@ go-audiosocket/voicebot
 *.tmp
 .env
 
-# Google Cloud credentials (if any local files)
+# Google Cloud credentials (NEVER commit these!)
 credentials.json
 service-account-key.json
+*-key.json
+gcp-*.json
+
+# Debug and log files (generated at runtime)
+logs/
+transcripts/
+*.log
+*.txt
+*.bin
+websocket_debug.txt
+audio_debug.txt
+received_audio_bytes.bin
+live_conversation_transcript.txt
+conversation_transcript.txt
+
+# Docker volumes
+docker-compose.override.yml
