@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY *.py ./
 
+# Create logs directory
+RUN mkdir -p logs
+
 # Expose the port
 EXPOSE 8080
 

@@ -207,7 +207,7 @@ def echo(ws):
                                 # REMOVE FOR PRODUCTION: Write ongoing transcript to file
                                 try:
                                     ongoing_transcript = "".join(Final_Transcript)
-                                    with open("live_conversation_transcript.txt", "w", encoding="utf-8") as f:
+                                    with open("logs/live_conversation_transcript.txt", "w", encoding="utf-8") as f:
                                         f.write(f"=== LIVE CONVERSATION TRANSCRIPT ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===\n")
                                         f.write(ongoing_transcript)
                                         f.write("\n=== CONVERSATION IN PROGRESS ===\n")
@@ -220,7 +220,7 @@ def echo(ws):
                                 
                                 # REMOVE FOR PRODUCTION: Write transcript to local file
                                 try:
-                                    with open("conversation_transcript.txt", "w", encoding="utf-8") as f:
+                                    with open("logs/conversation_transcript.txt", "w", encoding="utf-8") as f:
                                         f.write(f"=== CONVERSATION TRANSCRIPT ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===\n")
                                         f.write(Transcript)
                                         f.write("\n=== END OF TRANSCRIPT ===\n")

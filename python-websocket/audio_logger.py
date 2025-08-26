@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 
 class AudioFlowLogger:
-    def __init__(self, log_file="audio_debug.txt"):
+    def __init__(self, log_file="logs/audio_debug.txt"):
         self.audio_bytes_sent_to_gemini = 0
         self.audio_bytes_received_from_gemini = 0
         self.audio_chunks_sent_to_go = 0

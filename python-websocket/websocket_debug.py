@@ -3,7 +3,7 @@ from datetime import datetime
 import os
 
 class WebSocketDebugLogger:
-    def __init__(self, log_file="websocket_debug.txt", audio_dump_file="received_audio_bytes.bin"):
+    def __init__(self, log_file="logs/websocket_debug.txt", audio_dump_file="logs/received_audio_bytes.bin"):
         self.log_file = log_file
         self.audio_dump_file = audio_dump_file
         self.audio_chunk_count = 0
