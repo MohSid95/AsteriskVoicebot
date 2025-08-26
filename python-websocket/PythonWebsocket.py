@@ -128,14 +128,30 @@ def echo(ws):
 
     threading.Thread(target=audio_input_reader, daemon=True).start()
 
-    # ——— Async: flush Gemini→Audio Output frames ———
+    # Add this function to create AudioSocket messages
+    def create_audiosocket_message(pcm_data):
+        """
+        Create an AudioSocket TLV message for PCM data.
+        AudioSocket format: [Type: 1 byte][Length: 2 bytes big-endian][Payload]
+        Type 0x10 = SLIN audio
+        """
+        msg_type = 0x10  # SLIN audio type
+        length = len(pcm_data)
+        # Pack as big-endian: 1 byte type + 2 bytes length + payload
+        header = bytes([msg_type]) + length.to_bytes(2, 'big')
+        return header + pcm_data
+
+    # Modified send_audio_back function
     async def send_audio_back():
         nonlocal ws_active
         try:
             while ws_active:
                 return_msg = await AudioOutputQueue.get()
                 if return_msg:
-                    ws.send(return_msg, binary=True)  # Send as binary, not text
+                    # Wrap PCM data in AudioSocket format before sending
+                    audiosocket_msg = create_audiosocket_message(return_msg)
+                    ws.send(audiosocket_msg, binary=True)
+                    debug_logger.log(f"Sent AudioSocket message: {len(audiosocket_msg)} bytes (header: 3, PCM: {len(return_msg)})")
         except Exception as e:
             print("send_audio_back error:", e)
         finally:
