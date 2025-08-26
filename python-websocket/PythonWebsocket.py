@@ -128,30 +128,15 @@ def echo(ws):
 
     threading.Thread(target=audio_input_reader, daemon=True).start()
 
-    # Add this function to create AudioSocket messages
-    def create_audiosocket_message(pcm_data):
-        """
-        Create an AudioSocket TLV message for PCM data.
-        AudioSocket format: [Type: 1 byte][Length: 2 bytes big-endian][Payload]
-        Type 0x10 = SLIN audio
-        """
-        msg_type = 0x10  # SLIN audio type
-        length = len(pcm_data)
-        # Pack as big-endian: 1 byte type + 2 bytes length + payload
-        header = bytes([msg_type]) + length.to_bytes(2, 'big')
-        return header + pcm_data
-
-    # Modified send_audio_back function
+    # ——— Async: flush Gemini→Audio Output frames ———
     async def send_audio_back():
         nonlocal ws_active
         try:
             while ws_active:
                 return_msg = await AudioOutputQueue.get()
                 if return_msg:
-                    # Wrap PCM data in AudioSocket format before sending
-                    audiosocket_msg = create_audiosocket_message(return_msg)
-                    ws.send(audiosocket_msg, binary=True)
-                    debug_logger.log(f"Sent AudioSocket message: {len(audiosocket_msg)} bytes (header: 3, PCM: {len(return_msg)})")
+                    ws.send(return_msg, binary=True)  # Send as binary, not text
+
         except Exception as e:
             print("send_audio_back error:", e)
         finally:
@@ -248,37 +233,8 @@ def echo(ws):
                                         f.write("\n=== CONVERSATION IN PROGRESS ===\n")
                                 except Exception as live_transcript_error:
                                     debug_logger.log_error("live_transcript_writing", live_transcript_error)  # REMOVE FOR PRODUCTION
-
-                        if response.tool_call:
-                            try:
-                                Transcript = "".join(Final_Transcript)
-                                
-                                # REMOVE FOR PRODUCTION: Write transcript to local file
-                                try:
-                                    with open("logs/conversation_transcript.txt", "w", encoding="utf-8") as f:
-                                        f.write(f"=== CONVERSATION TRANSCRIPT ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ===\n")
-                                        f.write(Transcript)
-                                        f.write("\n=== END OF TRANSCRIPT ===\n")
-                                    debug_logger.log("Transcript written to conversation_transcript.txt")  # REMOVE FOR PRODUCTION
-                                except Exception as transcript_error:
-                                    debug_logger.log_error("transcript_writing", transcript_error)  # REMOVE FOR PRODUCTION
-                                
-                                # Upload to GCS using configured bucket
-                                print(Transcript)
-
-                            except Exception as api_exc:
-                                api_json = {"error": str(api_exc)}
-                                
-                        # If the Agent has been interrupted, clear the AudioOutputQueue and send a clear message to audio output to clear buffered audio data.
-                        elif getattr(sc, "interrupted", False):
-                            print("The Agent has just been interrupted")
-                            try:
-                                while True:
-                                    AudioOutputQueue.get_nowait()
-                            except asyncio.QueueEmpty:
-                                pass
-                            continue
-                            
+                     
+                          
                         elif response.data:
                             # Convert from Gemini's 24kHz to target 8kHz
                             pcm24 = np.frombuffer(response.data, dtype='<i2').astype(np.float32) / 32768.0
