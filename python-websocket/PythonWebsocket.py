@@ -1,6 +1,7 @@
 import threading
 import queue
 import asyncio
+import time
 from datetime import datetime
 from flask import Flask
 from flask_sock import Sock
@@ -8,6 +9,7 @@ from voice_config import (
     load_all_config, initialize_gemini_client, build_gemini_session_config,
     write_to_gcs_without_local_save, pcm16_8khz_to_pcm_float32, resample_pcm
 )
+from audio_logger import AudioFlowLogger  # REMOVE FOR PRODUCTION
 from google.genai import types
 import numpy as np
 
@@ -55,6 +57,9 @@ def echo(ws):
     system_prompt = None
     transcriptWriteFlag = 0
     
+    # ——— Audio flow logger ———
+    audio_logger = AudioFlowLogger()  # REMOVE FOR PRODUCTION
+    
     # ——— Open the Gemini Live connection ———
     session_cm = client.aio.live.connect(model=model, config=config)
     session    = loop.run_until_complete(session_cm.__aenter__())
@@ -97,6 +102,7 @@ def echo(ws):
                         audio_config["target_sample_rate"]   # 16000
                     )
                     pcm16b = (pcm16k * 32767).astype('<i2').tobytes()
+                    audio_logger.log_audio_sent_to_gemini(len(pcm16b))  # REMOVE FOR PRODUCTION
                     loop.call_soon_threadsafe(
                         AudioInputQueue.put_nowait, pcm16b
                     )
@@ -167,6 +173,7 @@ def echo(ws):
                                 output_token_count += out_tokens
                         if output_transcription and output_transcription.text:
                             response_output_buffer.append(output_transcription.text)
+                            audio_logger.log_gemini_response()  # REMOVE FOR PRODUCTION
 
                         if input_transcription and input_transcription.text:
                             response_input_buffer.append(input_transcription.text)
@@ -204,6 +211,7 @@ def echo(ws):
                         elif response.data:
                             # Convert from Gemini's 24kHz to target 8kHz
                             pcm24 = np.frombuffer(response.data, dtype='<i2').astype(np.float32) / 32768.0
+                            audio_logger.log_audio_received_from_gemini(len(response.data))  # REMOVE FOR PRODUCTION
                             pcm8 = resample_pcm(
                                 pcm24,
                                 audio_config["gemini_sample_rate"],  # 24000
@@ -216,6 +224,7 @@ def echo(ws):
                             chunk_size = audio_config["chunk_size"]  # Should be 320 for 20ms chunks
                             for i in range(0, len(pcm8b), chunk_size):
                                 pcm_chunk = pcm8b[i:i + chunk_size]
+                                audio_logger.log_audio_chunk_sent_to_go()  # REMOVE FOR PRODUCTION
                                 
                                 # Send raw PCM chunk directly (Go app expects raw binary data)
                                 await AudioOutputQueue.put(pcm_chunk)
@@ -230,10 +239,11 @@ def echo(ws):
 
 
     loop.run_until_complete(asyncio.gather(initial_greeting()))
-    # Kick off the loops for updating the system prompt, sending GeminiInputQueue to Gemini to GeminiResponseQueue, and for GeminiResponseQueue to Twilio audio (i.e. phone call voice)
+    # Kick off the loops for updating the system prompt, sending AudioInputQueue to Gemini to AudioOutputQueue, and for AudioOutputQueue to Go app audio
     loop.run_until_complete(asyncio.gather(
         send_audio_back(),
-        gemini_bridge()
+        gemini_bridge(),
+        audio_logger.start_periodic_logging()  # REMOVE FOR PRODUCTION
     ))
 
 if __name__ == "__main__":

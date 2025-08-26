@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/CyCoreSystems/audiosocket"
@@ -29,6 +30,29 @@ func handleCall(pCtx context.Context, c net.Conn, cfg Config) {
 		return
 	}
 	log.Printf("call %s connected", id)
+
+	// REMOVE FOR PRODUCTION: Audio flow counters
+	var bytesToWS int64   // bytes sent to WebSocket (from Asterisk)
+	var bytesToAS int64   // bytes sent to AudioSocket (to Asterisk)
+
+	// REMOVE FOR PRODUCTION: Start periodic logging
+	logTicker := time.NewTicker(5 * time.Second)
+	defer logTicker.Stop()
+	go func() {
+		for {
+			select {
+			case <-callCtx.Done():
+				return
+			case <-logTicker.C:
+				toWS := atomic.SwapInt64(&bytesToWS, 0)
+				toAS := atomic.SwapInt64(&bytesToAS, 0)
+				log.Printf("=== AUDIO FLOW DEBUG (call %s) ===", id)
+				log.Printf("Audio bytes sent TO WebSocket (last 5s): %d", toWS)
+				log.Printf("Audio bytes sent TO Asterisk (last 5s): %d", toAS)
+				log.Printf("===========================================")
+			}
+		}
+	}()
 
 	// Connect to Python WebSocket
 	ws, resp, err := websocket.DefaultDialer.Dial(cfg.wsURL, nil)
@@ -85,6 +109,7 @@ func handleCall(pCtx context.Context, c net.Conn, cfg Config) {
 					errc <- fmt.Errorf("write WS: %w", err)
 					return
 				}
+				atomic.AddInt64(&bytesToWS, int64(len(payload))) // REMOVE FOR PRODUCTION
 			}
 		}
 	}()
@@ -111,6 +136,7 @@ func handleCall(pCtx context.Context, c net.Conn, cfg Config) {
 				errc <- fmt.Errorf("write AS: %w", err)
 				return
 			}
+			atomic.AddInt64(&bytesToAS, int64(len(msg))) // REMOVE FOR PRODUCTION
 		}
 	}()
 
