@@ -10,6 +10,7 @@ from voice_config import (
     write_to_gcs_without_local_save, pcm16_8khz_to_pcm_float32, resample_pcm
 )
 from audio_logger import AudioFlowLogger  # REMOVE FOR PRODUCTION
+from websocket_debug import WebSocketDebugLogger  # REMOVE FOR PRODUCTION
 from google.genai import types
 import numpy as np
 
@@ -39,7 +40,8 @@ client, model = initialize_gemini_client(gemini_config)
         
 @sock.route('/media')
 def echo(ws):
-    print("WebSocket connection accepted")
+    debug_logger = WebSocketDebugLogger()  # REMOVE FOR PRODUCTION
+    debug_logger.log_connection_accepted()  # REMOVE FOR PRODUCTION
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     start_event = asyncio.Event()
@@ -63,7 +65,7 @@ def echo(ws):
     # ——— Open the Gemini Live connection ———
     session_cm = client.aio.live.connect(model=model, config=config)
     session    = loop.run_until_complete(session_cm.__aenter__())
-    print("Agent session opened at", datetime.now())
+    debug_logger.log_gemini_session_opened()  # REMOVE FOR PRODUCTION
 
 
     # ——— Function to update the Gemini Live system prompt with the custom parameters pulled in the twilio_reader's event==start message.
@@ -81,17 +83,26 @@ def echo(ws):
     # ——— Thread: blocking audio input reader ———
     def audio_input_reader():
         nonlocal stream_sid, ws_active, callSid, referenceId, system_prompt
+        debug_logger.log_thread_started("Audio input reader")  # REMOVE FOR PRODUCTION
         
         try:
             while ws_active:
+                debug_logger.log_waiting_for_message()  # REMOVE FOR PRODUCTION
                 msg = ws.receive()  # blocking - receives binary data
+                debug_logger.log_message_received(len(msg) if msg else 0)  # REMOVE FOR PRODUCTION
+                
                 if msg is None:
-                    print("Audio source closed connection")
+                    debug_logger.log_connection_closed()  # REMOVE FOR PRODUCTION
                     loop.call_soon_threadsafe(AudioInputQueue.put_nowait, None)
                     break
 
+                # REMOVE FOR PRODUCTION: Dump raw audio bytes for analysis
+                if msg:
+                    debug_logger.dump_audio_bytes(msg)  # REMOVE FOR PRODUCTION
+
                 # Go app sends raw PCM data directly (320 bytes = 20ms @ 8kHz, 16-bit)
                 if len(msg) == 320:  # Expected chunk size from Go app
+                    debug_logger.log_processing_chunk(320)  # REMOVE FOR PRODUCTION
                     # Convert raw PCM bytes to float32
                     pcm_f32 = pcm16_8khz_to_pcm_float32(msg)
                     
@@ -106,11 +117,12 @@ def echo(ws):
                     loop.call_soon_threadsafe(
                         AudioInputQueue.put_nowait, pcm16b
                     )
+                    debug_logger.log_sent_to_gemini_queue(len(pcm16b))  # REMOVE FOR PRODUCTION
                 else:
-                    print(f"Unexpected audio chunk size: {len(msg)} bytes, expected 320")
+                    debug_logger.log_unexpected_chunk_size(len(msg), 320)  # REMOVE FOR PRODUCTION
 
         except Exception as e:
-            print("audio_input_reader error:", e)
+            debug_logger.log_error("audio_input_reader", e)  # REMOVE FOR PRODUCTION
             loop.call_soon_threadsafe(AudioInputQueue.put_nowait, None)
 
     threading.Thread(target=audio_input_reader, daemon=True).start()
