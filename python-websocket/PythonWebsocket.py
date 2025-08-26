@@ -170,8 +170,26 @@ def echo(ws):
                 nonlocal Final_Transcript, transcriptWriteFlag
                 input_token_count = 0
                 output_token_count = 0
+                response_count = 0  # REMOVE FOR PRODUCTION
                 while True:
                     async for response in session.receive():
+                        response_count += 1  # REMOVE FOR PRODUCTION
+                        
+                        # REMOVE FOR PRODUCTION: Log full response details
+                        try:
+                            with open("logs/gemini_responses.txt", "a", encoding="utf-8") as f:
+                                f.write(f"\n=== GEMINI RESPONSE #{response_count} ({datetime.now().strftime('%H:%M:%S.%f')[:-3]}) ===\n")
+                                f.write(f"Response type: {type(response)}\n")
+                                f.write(f"Response attributes: {dir(response)}\n")
+                                f.write(f"Has data: {hasattr(response, 'data')}\n")
+                                if hasattr(response, 'data'):
+                                    f.write(f"Data length: {len(response.data) if response.data else 'None'}\n")
+                                f.write(f"Has server_content: {hasattr(response, 'server_content')}\n")
+                                f.write(f"Has tool_call: {hasattr(response, 'tool_call')}\n")
+                                f.write(f"Full response: {response}\n")
+                                f.write("=" * 60 + "\n")
+                        except Exception as e:
+                            debug_logger.log_error("gemini_response_logging", e)  # REMOVE FOR PRODUCTION
                         sc = getattr(response, 'server_content', None)
                         output_transcription = getattr(sc, 'output_transcription', None)
                         input_transcription = getattr(sc, 'input_transcription', None)
