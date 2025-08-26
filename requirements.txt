@@ -1,17 +1,7 @@
-# Core web framework
-Flask>=2.3.0
-flask-sock>=0.6.0
-
-# Audio processing
-numpy>=1.24.0
-librosa>=0.10.0
-
-# Google Cloud and AI services
-google-cloud-storage>=2.10.0
-google-genai>=0.3.0
-
-# Additional utilities (if needed)
-requests>=2.31.0
-
-# Python standard library modules (included with Python)
-# - threading, queue, asyncio, datetime, json, struct, os, time, base64, audioop
+Flask
+flask-sock
+numpy
+librosa
+google-cloud-storage
+google-genai
+requests
