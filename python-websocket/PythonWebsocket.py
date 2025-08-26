@@ -68,9 +68,9 @@ def echo(ws):
     debug_logger.log_gemini_session_opened()  # REMOVE FOR PRODUCTION
 
 
-    # ——— Function to update the Gemini Live system prompt with the custom parameters pulled in the twilio_reader's event==start message.
+    # ——— Function to send initial system prompt to Gemini
     async def initial_greeting():
-        await start_event.wait()
+        debug_logger.log("Sending initial system prompt to Gemini")  # REMOVE FOR PRODUCTION
         await session.send_client_content(
             turns={"role": "system", "parts":[{"text": system_prompt}]},
             turn_complete=False
@@ -79,6 +79,7 @@ def echo(ws):
         turns={"role": "user", "parts": [{"text": ""}]},
         turn_complete=True
         )
+        debug_logger.log("Initial greeting completed successfully")  # REMOVE FOR PRODUCTION
 
     # ——— Thread: blocking audio input reader ———
     def audio_input_reader():
