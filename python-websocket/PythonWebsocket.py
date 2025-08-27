@@ -151,7 +151,7 @@ def echo(ws):
                         samples = struct.unpack('<4h', return_msg[:8])  # First 4 16-bit samples  # REMOVE FOR PRODUCTION
                         print(f"[AUDIO_OUT] First 4 PCM samples (16-bit signed): {samples}")  # REMOVE FOR PRODUCTION
                     
-                    ws.send(return_msg, binary=True)  # Send as binary, not text
+                    ws.send(return_msg)  # Flask-Sock automatically handles binary data
 
         except Exception as e:
             print("send_audio_back error:", e)
