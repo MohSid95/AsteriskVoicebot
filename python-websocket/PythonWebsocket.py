@@ -119,19 +119,14 @@ def echo(ws):
     # ——— Async: flush Gemini→Audio Output frames ———
     async def send_audio_back():
         nonlocal ws_active
-        chunk_count = 0  # REMOVE FOR PRODUCTION
         try:
             while ws_active:
                 return_msg = await AudioOutputQueue.get()
                 if return_msg:
-                    chunk_count += 1  # REMOVE FOR PRODUCTION
-                    print(f"[AUDIO_OUT] Sending chunk #{chunk_count}, {len(return_msg)} bytes")  # REMOVE FOR PRODUCTION
-                    
                     try:
                         ws.send(return_msg)  # Flask-Sock automatically handles binary data
-                        print(f"[AUDIO_OUT] Successfully sent chunk #{chunk_count}")  # REMOVE FOR PRODUCTION
                     except Exception as send_error:
-                        print(f"[AUDIO_OUT] Failed to send chunk #{chunk_count}: {send_error}")  # REMOVE FOR PRODUCTION
+                        print(f"Failed to send audio chunk: {send_error}")
                         break
 
         except Exception as e:
@@ -233,8 +228,6 @@ def echo(ws):
                      
                           
                         elif response.data:
-                            print(f"[GEMINI_AUDIO] Received {len(response.data)} bytes from Gemini")  # REMOVE FOR PRODUCTION
-                            
                             # Convert from Gemini's 24kHz to target 8kHz
                             pcm24 = np.frombuffer(response.data, dtype='<i2').astype(np.float32) / 32768.0
                             pcm8 = resample_pcm(
@@ -243,20 +236,15 @@ def echo(ws):
                                 audio_config["source_sample_rate"]   # 8000
                             )
                             pcm8b = (pcm8 * 32767).astype('<i2').tobytes()
-                            print(f"[GEMINI_AUDIO] After resampling: {len(pcm8b)} bytes")  # REMOVE FOR PRODUCTION
 
                             # Send raw PCM data directly to Go app (no AudioSocket TLV wrapping)
                             # Use configured chunk size (320 bytes = 160 samples @ 16-bit = 20ms @ 8kHz)
                             chunk_size = audio_config["chunk_size"]  # Should be 320 for 20ms chunks
-                            chunks_created = 0  # REMOVE FOR PRODUCTION
                             for i in range(0, len(pcm8b), chunk_size):
                                 pcm_chunk = pcm8b[i:i + chunk_size]
-                                chunks_created += 1  # REMOVE FOR PRODUCTION
                                 
                                 # Send raw PCM chunk directly (Go app expects raw binary data)
                                 await AudioOutputQueue.put(pcm_chunk)
-                            
-                            print(f"[GEMINI_AUDIO] Created {chunks_created} chunks of {chunk_size} bytes each")  # REMOVE FOR PRODUCTION
 
             await asyncio.gather(sender(), receiver())
 
