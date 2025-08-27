@@ -51,7 +51,6 @@ gcp-*.json
 logs/
 transcripts/
 *.log
-*.txt
 *.bin
 websocket_debug.txt
 audio_debug.txt

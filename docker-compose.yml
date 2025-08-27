@@ -8,7 +8,6 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./transcripts:/app/transcripts
-      - ./python-websocket:/app
       - ./credentials.json:/app/credentials.json:ro  # Mount Google Cloud credentials
     environment:
       - PYTHONUNBUFFERED=1
