@@ -118,12 +118,16 @@ def echo(ws):
     # ——— Async: flush Gemini→Audio Output frames ———
     async def send_audio_back():
         nonlocal ws_active
+        import asyncio
         try:
             while ws_active:
                 return_msg = await AudioOutputQueue.get()
                 if return_msg:
                     try:
                         ws.send(return_msg)  # Flask-Sock automatically handles binary data
+                        # CRITICAL: AudioSocket expects 20ms timing between chunks
+                        # 320 bytes = 160 samples @ 8kHz = exactly 20ms of audio
+                        await asyncio.sleep(0.02)  # 20ms delay for proper AudioSocket timing
                     except Exception as send_error:
                         print(f"Failed to send audio chunk: {send_error}")
                         break
@@ -236,14 +240,18 @@ def echo(ws):
                             )
                             pcm8b = (pcm8 * 32767).astype('<i2').tobytes()
 
-                            # Send raw PCM data directly to Go app (no AudioSocket TLV wrapping)
-                            # Use configured chunk size (320 bytes = 160 samples @ 16-bit = 20ms @ 8kHz)
-                            chunk_size = audio_config["chunk_size"]  # Should be 320 for 20ms chunks
+                            # AudioSocket requires EXACTLY 320-byte chunks sent every 20ms
+                            chunk_size = 320  # MUST be exactly 320 bytes for AudioSocket SLIN
                             for i in range(0, len(pcm8b), chunk_size):
                                 pcm_chunk = pcm8b[i:i + chunk_size]
                                 
-                                # Send raw PCM chunk directly (Go app expects raw binary data)
-                                await AudioOutputQueue.put(pcm_chunk)
+                                # CRITICAL: Go audiosocket drops chunks != 320 bytes
+                                if len(pcm_chunk) == chunk_size:
+                                    await AudioOutputQueue.put(pcm_chunk)
+                                elif len(pcm_chunk) > 0:
+                                    # Pad short chunks with silence (zeros) to exactly 320 bytes
+                                    padded_chunk = pcm_chunk + bytes(chunk_size - len(pcm_chunk))
+                                    await AudioOutputQueue.put(padded_chunk)
 
             await asyncio.gather(sender(), receiver())
 
