@@ -97,9 +97,6 @@ def echo(ws):
                     loop.call_soon_threadsafe(AudioInputQueue.put_nowait, None)
                     break
 
-                # REMOVE FOR PRODUCTION: Dump raw audio bytes for analysis
-                if msg:
-                    debug_logger.dump_audio_bytes(msg)  # REMOVE FOR PRODUCTION
 
                 # Go app sends raw PCM data directly (320 bytes = 20ms @ 8kHz, 16-bit)
                 if len(msg) == 320:  # Expected chunk size from Go app
