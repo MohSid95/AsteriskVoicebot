@@ -228,22 +228,16 @@ def echo(ws):
                      
                           
                         elif response.data:
-                            # Convert from Gemini's 24kHz to target 8kHz
-                            pcm24 = np.frombuffer(response.data, dtype='<i2').astype(np.float32) / 32768.0
-                            pcm8 = resample_pcm(
-                                pcm24,
-                                audio_config["gemini_sample_rate"],  # 24000
-                                audio_config["source_sample_rate"]   # 8000
-                            )
-                            pcm8b = (pcm8 * 32767).astype('<i2').tobytes()
-
-                            # Send raw PCM data directly to Go app (no AudioSocket TLV wrapping)
-                            # Use configured chunk size (320 bytes = 160 samples @ 16-bit = 20ms @ 8kHz)
-                            chunk_size = audio_config["chunk_size"]  # Should be 320 for 20ms chunks
-                            for i in range(0, len(pcm8b), chunk_size):
-                                pcm_chunk = pcm8b[i:i + chunk_size]
+                            # TESTING: Send Gemini's 24kHz audio directly without downsampling
+                            # This bypasses resampling to test if that's causing quality issues
+                            
+                            # Use chunk size for 24kHz: 960 bytes = 480 samples @ 16-bit = 20ms @ 24kHz
+                            chunk_size_24khz = 960  # 20ms at 24kHz, 16-bit
+                            
+                            for i in range(0, len(response.data), chunk_size_24khz):
+                                pcm_chunk = response.data[i:i + chunk_size_24khz]
                                 
-                                # Send raw PCM chunk directly (Go app expects raw binary data)
+                                # Send raw 24kHz PCM chunk directly (Go app will receive 24kHz data)
                                 await AudioOutputQueue.put(pcm_chunk)
 
             await asyncio.gather(sender(), receiver())
