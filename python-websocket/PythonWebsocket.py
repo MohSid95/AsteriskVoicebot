@@ -125,9 +125,7 @@ def echo(ws):
                 if return_msg:
                     try:
                         ws.send(return_msg)  # Flask-Sock automatically handles binary data
-                        # CRITICAL: AudioSocket expects 20ms timing between chunks
-                        # 320 bytes = 160 samples @ 8kHz = exactly 20ms of audio
-                        await asyncio.sleep(0.02)  # 20ms delay for proper AudioSocket timing
+                        # Let Go audiosocket handle timing - it has proper buffering
                     except Exception as send_error:
                         print(f"Failed to send audio chunk: {send_error}")
                         break
