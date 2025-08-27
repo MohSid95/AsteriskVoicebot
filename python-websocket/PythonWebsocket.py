@@ -107,8 +107,7 @@ def echo(ws):
                     loop.call_soon_threadsafe(
                         AudioInputQueue.put_nowait, pcm16b
                     )
-                else:
-                    debug_logger.log_unexpected_chunk_size(len(msg), 320)  # REMOVE FOR PRODUCTION
+                # Skip processing non-320 byte chunks (unexpected size)
 
         except Exception as e:
             debug_logger.log_error("audio_input_reader", e)  # REMOVE FOR PRODUCTION
