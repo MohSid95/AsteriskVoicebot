@@ -101,6 +101,16 @@ def echo(ws):
                 # Go app sends raw PCM data directly (320 bytes = 20ms @ 8kHz, 16-bit)
                 if len(msg) == 320:  # Expected chunk size from Go app
                     debug_logger.log_processing_chunk(320)  # REMOVE FOR PRODUCTION
+                    
+                    # REMOVE FOR PRODUCTION: AUDIO FORMAT VERIFICATION - Log incoming bytes from Go
+                    print(f"[AUDIO_IN] Received from Go: {len(msg)} bytes")  # REMOVE FOR PRODUCTION
+                    print(f"[AUDIO_IN] First 16 bytes: {list(msg[:16])}")  # REMOVE FOR PRODUCTION
+                    print(f"[AUDIO_IN] First 16 bytes (hex): {msg[:16].hex()}")  # REMOVE FOR PRODUCTION
+                    import struct  # REMOVE FOR PRODUCTION
+                    if len(msg) >= 8:  # REMOVE FOR PRODUCTION
+                        samples = struct.unpack('<4h', msg[:8])  # First 4 16-bit samples  # REMOVE FOR PRODUCTION
+                        print(f"[AUDIO_IN] First 4 PCM samples (16-bit signed): {samples}")  # REMOVE FOR PRODUCTION
+                    
                     # Convert raw PCM bytes to float32
                     pcm_f32 = pcm16_8khz_to_pcm_float32(msg)
                     
@@ -128,10 +138,19 @@ def echo(ws):
     # ——— Async: flush Gemini→Audio Output frames ———
     async def send_audio_back():
         nonlocal ws_active
+        import struct  # REMOVE FOR PRODUCTION
         try:
             while ws_active:
                 return_msg = await AudioOutputQueue.get()
                 if return_msg:
+                    # REMOVE FOR PRODUCTION: AUDIO FORMAT VERIFICATION - Log outgoing bytes to Go
+                    print(f"[AUDIO_OUT] Sending to Go: {len(return_msg)} bytes")  # REMOVE FOR PRODUCTION
+                    print(f"[AUDIO_OUT] First 16 bytes: {list(return_msg[:16])}")  # REMOVE FOR PRODUCTION
+                    print(f"[AUDIO_OUT] First 16 bytes (hex): {return_msg[:16].hex()}")  # REMOVE FOR PRODUCTION
+                    if len(return_msg) >= 8:  # REMOVE FOR PRODUCTION
+                        samples = struct.unpack('<4h', return_msg[:8])  # First 4 16-bit samples  # REMOVE FOR PRODUCTION
+                        print(f"[AUDIO_OUT] First 4 PCM samples (16-bit signed): {samples}")  # REMOVE FOR PRODUCTION
+                    
                     ws.send(return_msg, binary=True)  # Send as binary, not text
 
         except Exception as e:
