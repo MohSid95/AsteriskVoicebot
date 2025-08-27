@@ -115,25 +115,35 @@ def echo(ws):
 
     threading.Thread(target=audio_input_reader, daemon=True).start()
 
-    # ——— Async: flush Gemini→Audio Output frames ———
+    # ——— Async: flush Gemini→Audio Output frames with proper timing ———
     async def send_audio_back():
         nonlocal ws_active
         import asyncio
-        try:
+        
+        # Separate timing loop - sends queued chunks every 20ms
+        async def timed_sender():
+            last_send_time = asyncio.get_event_loop().time()
             while ws_active:
-                return_msg = await AudioOutputQueue.get()
-                if return_msg:
-                    try:
-                        ws.send(return_msg)  # Flask-Sock automatically handles binary data
-                        # Let Go audiosocket handle timing - it has proper buffering
-                    except Exception as send_error:
-                        print(f"Failed to send audio chunk: {send_error}")
-                        break
-
-        except Exception as e:
-            print("send_audio_back error:", e)
-        finally:
-            ws_send_queue.put(None)
+                try:
+                    # Get chunk without blocking - immediate if available
+                    return_msg = AudioOutputQueue.get_nowait()
+                    ws.send(return_msg)
+                    
+                    # Maintain 20ms intervals for AudioSocket protocol
+                    current_time = asyncio.get_event_loop().time()
+                    elapsed = current_time - last_send_time
+                    if elapsed < 0.02:  # Less than 20ms since last send
+                        await asyncio.sleep(0.02 - elapsed)
+                    last_send_time = asyncio.get_event_loop().time()
+                    
+                except asyncio.QueueEmpty:
+                    # No chunks ready - small sleep to prevent busy waiting
+                    await asyncio.sleep(0.001)  # 1ms check interval
+                except Exception as send_error:
+                    print(f"Failed to send audio chunk: {send_error}")
+                    break
+        
+        await timed_sender()
     
 
     # ——— Async: bridge Audio Input ↔ Gemini ———
