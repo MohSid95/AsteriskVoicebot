@@ -41,7 +41,6 @@ client, model = initialize_gemini_client(gemini_config)
 @sock.route('/media')
 def echo(ws):
     debug_logger = WebSocketDebugLogger()  # REMOVE FOR PRODUCTION
-    debug_logger.log_connection_accepted()  # REMOVE FOR PRODUCTION
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     start_event = asyncio.Event()
@@ -65,12 +64,10 @@ def echo(ws):
     # ——— Open the Gemini Live connection ———
     session_cm = client.aio.live.connect(model=model, config=config)
     session    = loop.run_until_complete(session_cm.__aenter__())
-    debug_logger.log_gemini_session_opened()  # REMOVE FOR PRODUCTION
 
 
     # ——— Function to send initial system prompt to Gemini
     async def initial_greeting():
-        debug_logger.log("Sending initial system prompt to Gemini")  # REMOVE FOR PRODUCTION
         await session.send_client_content(
             turns={"role": "system", "parts":[{"text": system_prompt}]},
             turn_complete=False
@@ -79,37 +76,23 @@ def echo(ws):
         turns={"role": "user", "parts": [{"text": ""}]},
         turn_complete=True
         )
-        debug_logger.log("Initial greeting completed successfully")  # REMOVE FOR PRODUCTION
 
     # ——— Thread: blocking audio input reader ———
     def audio_input_reader():
         nonlocal stream_sid, ws_active, callSid, referenceId, system_prompt
-        debug_logger.log_thread_started("Audio input reader")  # REMOVE FOR PRODUCTION
         
         try:
             while ws_active:
-                debug_logger.log_waiting_for_message()  # REMOVE FOR PRODUCTION
                 msg = ws.receive()  # blocking - receives binary data
-                debug_logger.log_message_received(len(msg) if msg else 0)  # REMOVE FOR PRODUCTION
                 
                 if msg is None:
-                    debug_logger.log_connection_closed()  # REMOVE FOR PRODUCTION
                     loop.call_soon_threadsafe(AudioInputQueue.put_nowait, None)
                     break
 
 
                 # Go app sends raw PCM data directly (320 bytes = 20ms @ 8kHz, 16-bit)
                 if len(msg) == 320:  # Expected chunk size from Go app
-                    debug_logger.log_processing_chunk(320)  # REMOVE FOR PRODUCTION
                     
-                    # REMOVE FOR PRODUCTION: AUDIO FORMAT VERIFICATION - Log incoming bytes from Go
-                    print(f"[AUDIO_IN] Received from Go: {len(msg)} bytes")  # REMOVE FOR PRODUCTION
-                    print(f"[AUDIO_IN] First 16 bytes: {list(msg[:16])}")  # REMOVE FOR PRODUCTION
-                    print(f"[AUDIO_IN] First 16 bytes (hex): {msg[:16].hex()}")  # REMOVE FOR PRODUCTION
-                    import struct  # REMOVE FOR PRODUCTION
-                    if len(msg) >= 8:  # REMOVE FOR PRODUCTION
-                        samples = struct.unpack('<4h', msg[:8])  # First 4 16-bit samples  # REMOVE FOR PRODUCTION
-                        print(f"[AUDIO_IN] First 4 PCM samples (16-bit signed): {samples}")  # REMOVE FOR PRODUCTION
                     
                     # Convert raw PCM bytes to float32
                     pcm_f32 = pcm16_8khz_to_pcm_float32(msg)
@@ -121,11 +104,9 @@ def echo(ws):
                         audio_config["target_sample_rate"]   # 16000
                     )
                     pcm16b = (pcm16k * 32767).astype('<i2').tobytes()
-                    audio_logger.log_audio_sent_to_gemini(len(pcm16b))  # REMOVE FOR PRODUCTION
                     loop.call_soon_threadsafe(
                         AudioInputQueue.put_nowait, pcm16b
                     )
-                    debug_logger.log_sent_to_gemini_queue(len(pcm16b))  # REMOVE FOR PRODUCTION
                 else:
                     debug_logger.log_unexpected_chunk_size(len(msg), 320)  # REMOVE FOR PRODUCTION
 
@@ -138,18 +119,10 @@ def echo(ws):
     # ——— Async: flush Gemini→Audio Output frames ———
     async def send_audio_back():
         nonlocal ws_active
-        import struct  # REMOVE FOR PRODUCTION
         try:
             while ws_active:
                 return_msg = await AudioOutputQueue.get()
                 if return_msg:
-                    # REMOVE FOR PRODUCTION: AUDIO FORMAT VERIFICATION - Log outgoing bytes to Go
-                    print(f"[AUDIO_OUT] Sending to Go: {len(return_msg)} bytes")  # REMOVE FOR PRODUCTION
-                    print(f"[AUDIO_OUT] First 16 bytes: {list(return_msg[:16])}")  # REMOVE FOR PRODUCTION
-                    print(f"[AUDIO_OUT] First 16 bytes (hex): {return_msg[:16].hex()}")  # REMOVE FOR PRODUCTION
-                    if len(return_msg) >= 8:  # REMOVE FOR PRODUCTION
-                        samples = struct.unpack('<4h', return_msg[:8])  # First 4 16-bit samples  # REMOVE FOR PRODUCTION
-                        print(f"[AUDIO_OUT] First 4 PCM samples (16-bit signed): {samples}")  # REMOVE FOR PRODUCTION
                     
                     ws.send(return_msg)  # Flask-Sock automatically handles binary data
 
@@ -254,7 +227,6 @@ def echo(ws):
                         elif response.data:
                             # Convert from Gemini's 24kHz to target 8kHz
                             pcm24 = np.frombuffer(response.data, dtype='<i2').astype(np.float32) / 32768.0
-                            audio_logger.log_audio_received_from_gemini(len(response.data))  # REMOVE FOR PRODUCTION
                             pcm8 = resample_pcm(
                                 pcm24,
                                 audio_config["gemini_sample_rate"],  # 24000
@@ -267,7 +239,6 @@ def echo(ws):
                             chunk_size = audio_config["chunk_size"]  # Should be 320 for 20ms chunks
                             for i in range(0, len(pcm8b), chunk_size):
                                 pcm_chunk = pcm8b[i:i + chunk_size]
-                                audio_logger.log_audio_chunk_sent_to_go()  # REMOVE FOR PRODUCTION
                                 
                                 # Send raw PCM chunk directly (Go app expects raw binary data)
                                 await AudioOutputQueue.put(pcm_chunk)
@@ -286,7 +257,6 @@ def echo(ws):
     loop.run_until_complete(asyncio.gather(
         send_audio_back(),
         gemini_bridge(),
-        audio_logger.start_periodic_logging()  # REMOVE FOR PRODUCTION
     ))
 
 if __name__ == "__main__":
